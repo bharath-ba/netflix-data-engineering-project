@@ -1,148 +1,75 @@
-# netflix-data-engineering-project
-
-This project demonstrates a complete **Data Engineering Pipeline** using Azure’s data services. The solution processes, transforms, and delivers data for **Business Intelligence (BI)** reporting using:
-
-- **Azure Data Factory**
-- **Azure Databricks**
-- **Azure Synapse Analytics**
-- **Power BI**
-
-📊 **Data Source**: [AdventureWorks Dataset](https://github.com/) (fetched via HTTP from GitHub)
+Of course. Here is a `README.md` file based on the second set of images you provided.
 
 ---
 
-## 📌 Architecture Overview
+# End-to-End Data Engineering with Netflix Data on Azure
 
-```text
-GitHub (Raw Data) 
-   ↓ (HTTP API)
-Azure Data Factory (ADF)
-   ↓
-Azure Data Lake Storage (Bronze → Silver → Gold)
-   ↓
-Azure Databricks (Transformation)
-   ↓
-Azure Synapse Analytics (Warehousing & SQL)
-   ↓
-Power BI (Reporting & Dashboards)
-```
+This repository outlines an end-to-end data engineering project built on the Azure cloud platform. The pipeline ingests the Netflix dataset from a public source, processes it using a modern data stack, and transforms it into a queryable format for analytics.
 
----
+The solution leverages Azure Data Factory for orchestration, Azure Data Lake Storage Gen2 for scalable storage, and Azure Databricks for high-performance data transformation.
 
-## ⚙️ Step 1: Setting Up the Azure Environment
+## Table of Contents
+- [Architecture](#architecture)
+- [Azure Resources](#azure-resources)
+- [Pipeline Implementation](#pipeline-implementation)
+  - [1. Data Ingestion with Azure Data Factory](#1-data-ingestion-with-azure-data-factory)
+  - [2. Data Storage with Azure Data Lake Gen2](#2-data-storage-with-azure-data-lake-gen2)
+  - [3. Data Transformation with Databricks Delta Live Tables](#3-data-transformation-with-databricks-delta-live-tables)
+- [Outcome](#outcome)
 
-Provisioned the following Azure services:
+## Architecture
 
-- 🔄 **Azure Data Factory** – Orchestration & automation
-- 🪣 **Azure Storage Account** – Data lake with `bronze`, `silver`, `gold` containers
-- 🔧 **Azure Databricks** – Data transformation & processing
-- 🏛 **Azure Synapse Analytics** – Serverless SQL for warehousing
-- 📊 **Power BI** – Data visualization and reporting
+The project follows a modern data pipeline architecture:
 
-✅ All services were connected with proper **IAM roles** to ensure secure and seamless data movement.
+1.  **Orchestration & Ingestion**: Azure Data Factory (ADF) orchestrates the entire workflow. A dynamic ADF pipeline fetches metadata from a GitHub repository and copies multiple dataset files into the raw layer of the data lake.
+2.  **Storage**: Azure Data Lake Storage (ADLS) Gen2 is used as the central data lake, employing a multi-layered Medallion architecture (Raw, Bronze, Silver, Gold) to logically separate data at different stages of refinement.
+3.  **Transformation**: Azure Databricks, specifically using a Delta Live Tables (DLT) pipeline, reads the raw data and performs a series of transformations to clean, model, and aggregate it into curated Gold-layer tables ready for consumption.
 
----
+## Azure Resources
 
-## 🚀 Step 2: Ingesting Data Using Azure Data Factory
+All resources for this project are managed under the `RG-NetflixProject` resource group in Azure.
 
-- **HTTP Connector**: ADF fetches raw data directly from GitHub.
-- **Dynamic Parameters**: Pipeline supports parameterization for flexible data sources.
-- **Sink**: Raw data is stored in the **bronze layer** of Azure Storage.
+*   **Azure Data Factory (`adf-netflix-ba`)**: Used to build and orchestrate the data ingestion pipeline.
+*   **Azure Databricks Service (`netflix-adb-ba`)**: The core analytics engine used for data transformation with Delta Live Tables.
+*   **Storage Account (`netflixprojectdlba`)**: The ADLS Gen2 data lake that stores the dataset across all layers.
+*   **Access Connector for Azure Databricks (`connector-netflix`)**: Provides a managed identity for securely connecting Azure Databricks to the storage account.
+![RG](images/DE-1.png)
+## Pipeline Implementation
 
-📁 **Output**: `.csv` or `.json` files stored in `bronze/`
+### 1. Data Ingestion with Azure Data Factory
 
----
+A single, dynamic pipeline named `pipeline1` in Azure Data Factory handles the entire ingestion process.
 
-## 🔄 Step 3: Data Transformation with Azure Databricks
+*   **Linked Services**: The pipeline uses two main linked services:
+    *   `github_con`: An HTTP connection to the source data repository.
+    *   `datalake_con`: A connection to the ADLS Gen2 sink.
+*   **Pipeline Logic**:
+    1.  A **Web** activity fetches a list of files or metadata from the GitHub source.
+    2.  A **ForEach** loop iterates through an array parameter containing the names of the datasets to be processed.
+    3.  Inside the loop, a **Copy data** activity dynamically copies each file from GitHub into the data lake.
+![ADF](images/DE-2.png)
+### 2. Data Storage with Azure Data Lake Gen2
 
-**Databricks Process**:
-- 🔥 Cluster setup for efficient processing
-- 📂 Connected to Azure Storage for reading `bronze` data
+The `netflixprojectdlba` storage account is structured with multiple containers to support the Medallion architecture:
 
-**Transformations**:
-- Normalized inconsistent date formats
-- Removed nulls, invalid, and incomplete rows
-- Aggregated & joined data for analysis-readiness
+*   **`raw`**: The landing zone for data ingested directly from the source by ADF.
+*   **`bronze`**: Stores the raw data converted into the efficient Delta Lake format.
+*   **`silver`**: Contains cleaned, filtered, and standardized data.
+*   **`gold`**: Holds the final, aggregated, business-ready tables for analytics and reporting.
+*   **`metastore`**: Used by Databricks for managing table metadata.
 
-📁 **Output**: Cleaned data saved in `silver/` as **Parquet** format
+### 3. Data Transformation with Databricks Delta Live Tables
 
----
+The core transformation logic is encapsulated in a Delta Live Tables (DLT) pipeline named `DLT_GOLD`.
 
-## 📊 Step 4: Warehousing with Azure Synapse Analytics
+*   **Declarative ETL**: The pipeline defines the data flow from Bronze to Gold layers declaratively.
+*   **Data Quality & Lineage**: DLT automatically manages dependencies between datasets, tracks data lineage, and allows for defining data quality expectations.
+*   **Gold Layer Creation**: The DLT pipeline processes the raw/bronze data and generates multiple curated streaming tables in the Gold layer, including:
+    *   `gold_netflixcategory`
+    *   `gold_netflixdirectors`
+    *   `gold_netflixaccount...`
+    *   And others, as defined in the pipeline graph.
+![Databricks Output](images/DLT.png)
+## Outcome
 
-- Connected to **Silver** container in Azure Data Lake
-- Utilized **Serverless SQL Pools** to query directly from Parquet files
-- Created:
-  - External Tables
-  - Views
-  - SQL Database and Schema for BI tools
-
-📁 **Output**: Curated `gold` dataset ready for reporting
-
----
-
-## 📈 Step 5: BI Dashboarding with Power BI
-
-- Connected Power BI to Azure Synapse
-- Built dashboards to visualize key KPIs:
-  - Sales performance
-  - Product categories
-  - Customer geography
-  - Year-over-year comparisons
-
-📊 **Goal**: Deliver meaningful insights to business stakeholders
-
----
-
-## ✅ Key Takeaways
-
-| Benefit        | Description                                                                 |
-|----------------|-----------------------------------------------------------------------------|
-| 🚀 Automation  | Seamless, no-code orchestration via ADF                                      |
-| ☁️ Scalability | Azure services handle enterprise-scale workloads                             |
-| 📦 Efficiency  | Parquet format + serverless querying = fast, low-cost analytics              |
-| 📊 Insightful  | Power BI integration enables interactive and real-time decision making       |
-
----
-
-## 🙌 Acknowledgments
-
-Inspired by the brilliant work of **Ansh Lamba**.  
-Check out his [GitHub](https://github.com/) and [YouTube Channel](https://www.youtube.com/) for in-depth tutorials and walkthroughs.
-
----
-
-## 📎 Useful Links
-
-- 🔗 [Azure Data Factory](https://learn.microsoft.com/en-us/azure/data-factory/)
-- 🔗 [Azure Databricks](https://learn.microsoft.com/en-us/azure/databricks/)
-- 🔗 [Azure Synapse Analytics](https://learn.microsoft.com/en-us/azure/synapse-analytics/)
-- 🔗 [Power BI](https://powerbi.microsoft.com/)
-
----
-
-## 📂 Project Structure
-
-```bash
-azure-e2e-pipeline/
-├── adf-pipeline/
-│   └── pipeline.json
-├── databricks-notebooks/
-│   └── transform_data.ipynb
-├── synapse-sql/
-│   └── external_tables.sql
-├── powerbi/
-│   └── dashboard.pbix
-├── README.md
-```
-
----
-
-## ✉️ Contact
-
-Have questions or want to collaborate?
-
-- 📧 your.email@example.com
-- 🔗 [LinkedIn](https://linkedin.com/in/your-profile)
-
----
+The result of this pipeline is a set of analysis-ready, high-quality tables in the **Gold** layer of the data lake. This curated data can be easily connected to BI tools like Power BI, used for advanced analytics, or served for machine learning workloads, providing valuable insights from the Netflix dataset.
